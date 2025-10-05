@@ -1,0 +1,24 @@
+#include <iostream>
+
+int main() {
+    using namespace std;
+    
+    int arr[] = {1, 2, 3, 2, 4, 1, 5, 4};
+    int n = sizeof(arr) / sizeof(arr[0]); // gtnum enq chapy
+
+    int x = 0;
+    for (int i = 0; i < n; i++)
+        x ^= arr[i];  
+
+    int y = x & -x;  // gtnum enq 3i ev 5i arajin tarbervox bity, 2 xmbi bajanelu hamar
+
+    int a = 0, b = 0;
+    for (int i = 0; i < n; i++) {
+        if (arr[i] & y)
+            a ^= arr[i];
+        else
+            b ^= arr[i];
+    }
+
+    cout << "chkrknvoxnery: " << a << " " << b << endl;
+}
