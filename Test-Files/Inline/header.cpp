@@ -1,3 +1,8 @@
-#include <iostream>
-#pragma once //header file mi angam ogtagorci
-inline int a = 10;
+#ifndef HEADER_HPP
+#define HEADER_HPP
+
+inline int a = 0; 
+
+void foo(); 
+
+#endif
