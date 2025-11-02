@@ -1,7 +1,7 @@
 #include <iostream>
 #include "header.hpp"
 
-void incrementCounter() {
+void foo() {
     ++a; 
     std::cout << "source1: a = " << a << std::endl;
 }
