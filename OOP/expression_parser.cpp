@@ -26,9 +26,9 @@ private:
         skipSpaces();
 
         if (expr[pos] == '(') {
-            pos++; // пропускаем '('
+            pos++; 
             double result = parseExpression();
-            pos++; // пропускаем ')'
+            pos++; 
             return result;
         }
 
