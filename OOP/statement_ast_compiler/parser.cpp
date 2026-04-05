@@ -1,58 +1,168 @@
 #include "parser.h"
+#include "token.h"
+#include <stdexcept>
 
-Parser::Parser(const vector<Token>& t)
-    : tokens(t), pos(0) {}
+// ── helpers 
+static Token& cur()  { return tokens[pos]; }
+static Token  eat()  { return tokens[pos++]; }
 
-shared_ptr<Node> Parser::parse() {
-    return parseStatement();
+static Token expect(TokenType t, const std::string& ctx) {
+    if (cur().type != t)
+        throw std::runtime_error("Parse error at '" + cur().value + "' in " + ctx);
+    return eat();
 }
 
-shared_ptr<Node> Parser::parseIf() {
+// ── Expression parsing 
+NodePtr parseFactor() {
+    Token t = eat();
 
-
-    pos++;
-  
-    auto cond = parseExpression();
-
-    auto body = parseStatement();
-
-    shared_ptr<Node> elseNode = nullptr;
-
-    if (tokens[pos].value == "else") {
-        pos++;
-        elseNode = parseStatement();
+    if (t.type == NUMBER) {
+        auto n = std::make_shared<Node>(NodeKind::NUMBER, t.value);
+        return n;
     }
+    if (t.type == VARIABLE) {
+        auto n = std::make_shared<Node>(NodeKind::VARIABLE, t.value);
+        return n;
+    }
+    if (t.type == LPAREN) {
+        auto n = parseExpression();
+        expect(RPAREN, "factor");
+        return n;
+    }
+    throw std::runtime_error("Unexpected token in factor: '" + t.value + "'");
+}
 
-    auto node = make_shared<Node>(NodeType::IF);
-    node->condition = cond;
-    node->body = body;
-    node->elseBranch = elseNode;
-
+// term   
+NodePtr parseTerm() {
+    auto node = parseFactor();
+    while (cur().type == MUL || cur().type == DIV) {
+        std::string op = eat().value;
+        auto right = parseFactor();
+        auto n = std::make_shared<Node>(NodeKind::BINOP, op);
+        n->left  = node;
+        n->right = right;
+        node = n;
+    }
     return node;
 }
 
+// additive 
+static NodePtr parseAdditive() {
+    auto node = parseTerm();
+    while (cur().type == PLUS || cur().type == MINUS) {
+        std::string op = eat().value;
+        auto right = parseTerm();
+        auto n = std::make_shared<Node>(NodeKind::BINOP, op);
+        n->left  = node;
+        n->right = right;
+        node = n;
+    }
+    return node;
+}
 
-shared_ptr<Node> Parser::parseWhile() {
+// comparison := additive 
+NodePtr parseComparison() {
+    auto node = parseAdditive();
+    TokenType tt = cur().type;
+    if (tt == LT || tt == GT || tt == LE || tt == GE || tt == EQ || tt == NEQ) {
+        std::string op = eat().value;
+        auto right = parseAdditive();
+        auto n = std::make_shared<Node>(NodeKind::BINOP, op);
+        n->left  = node;
+        n->right = right;
+        return n;
+    }
+    return node;
+}
 
-    pos++; 
+// expression := comparison
+NodePtr parseExpression() {
+    return parseComparison();
+}
 
+// ── Statement parsing
+NodePtr parseBlock() {
+    expect(LBRACE, "block");
+    auto block = std::make_shared<Node>(NodeKind::BLOCK);
+    while (cur().type != RBRACE && cur().type != END) {
+        block->stmts.push_back(parseStatement());
+    }
+    expect(RBRACE, "block end");
+    return block;
+}
+
+NodePtr parseIfStmt() {
+    eat(); 
+    expect(LPAREN, "if condition");
     auto cond = parseExpression();
-    auto body = parseStatement();
+    expect(RPAREN, "if condition");
+    auto body = parseBlock();
 
-    auto node = make_shared<Node>(NodeType::WHILE);
-    node->condition = cond;
+    auto node = std::make_shared<Node>(NodeKind::IF, "if");
+    node->cond = cond;
     node->body = body;
 
+    if (cur().type == ELSE) {
+        eat(); 
+        node->alt = parseBlock();
+    }
     return node;
 }
 
-shared_ptr<Node> Parser::parseStatement() {
+NodePtr parseWhileStmt() {
+    eat(); 
+    expect(LPAREN, "while condition");
+    auto cond = parseExpression();
+    expect(RPAREN, "while condition");
+    auto body = parseBlock();
 
-    if (tokens[pos].value == "if")
-        return parseIf();
+    auto node = std::make_shared<Node>(NodeKind::WHILE, "while");
+    node->cond = cond;
+    node->body = body;
+    return node;
+}
 
-    if (tokens[pos].value == "while")
-        return parseWhile();
+NodePtr parseReturn() {
+    eat(); // consume 'return'
+    auto expr = parseExpression();
+    expect(SEMICOLON, "return");
+    auto node = std::make_shared<Node>(NodeKind::RETURN, "return");
+    node->left = expr;
+    return node;
+}
 
-    return parseExpression();
+NodePtr parseAssignOrExpr() {
+    if (cur().type == VARIABLE && pos + 1 < (int)tokens.size()
+        && tokens[pos + 1].type == ASSIGN) {
+        std::string name = eat().value; 
+        eat();                         
+        auto val = parseExpression();
+        expect(SEMICOLON, "assignment");
+        auto node = std::make_shared<Node>(NodeKind::ASSIGN, name);
+        node->right = val;
+        return node;
+    }
+    // Plain expression statement
+    auto expr = parseExpression();
+    expect(SEMICOLON, "expression statement");
+    auto node = std::make_shared<Node>(NodeKind::EXPR_STMT);
+    node->left = expr;
+    return node;
+}
+
+NodePtr parseStatement() {
+    switch (cur().type) {
+        case IF:        return parseIfStmt();
+        case WHILE:     return parseWhileStmt();
+        case RETURN_KW: return parseReturn();
+        default:        return parseAssignOrExpr();
+    }
+}
+
+NodePtr parseProgram() {
+    auto prog = std::make_shared<Node>(NodeKind::BLOCK, "program");
+    while (cur().type != END) {
+        prog->stmts.push_back(parseStatement());
+    }
+    return prog;
 }
