@@ -1,29 +1,39 @@
 #pragma once
-#include <memory>
 #include <string>
+#include <memory>
 #include <vector>
 
-using namespace std;
-
-enum class NodeType {
-    NUMBER,
-    VARIABLE,
-    BINARY_OP,
-    IF,
-    WHILE
+enum class NodeKind {
+    // Expression nodes
+    NUMBER,       
+    VARIABLE,      
+    BINOP,         
+    // Statement nodes
+    ASSIGN,       
+    IF,            
+    WHILE,        
+    BLOCK,        
+    RETURN,        
+    EXPR_STMT      
 };
 
 struct Node {
-    NodeType type;
-    string value;
+    NodeKind kind;
+    std::string value;                      
 
-    shared_ptr<Node> left;
-    shared_ptr<Node> right;
+    // Expression children
+    std::shared_ptr<Node> left;
+    std::shared_ptr<Node> right;
 
-    shared_ptr<Node> condition;
-    shared_ptr<Node> body;
-    shared_ptr<Node> elseBranch;
+    // Statement children
+    std::shared_ptr<Node> cond;             
+    std::shared_ptr<Node> body;              
+    std::shared_ptr<Node> alt;              
+    std::vector<std::shared_ptr<Node>> stmts; 
 
-    Node(NodeType t, string v = "")
-        : type(t), value(v) {}
+    // Convenience constructors
+    explicit Node(NodeKind k, std::string v = "")
+        : kind(k), value(std::move(v)) {}
 };
+
+using NodePtr = std::shared_ptr<Node>;
